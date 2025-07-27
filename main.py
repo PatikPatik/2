@@ -1,54 +1,45 @@
 import os
-import asyncio
-from threading import Thread
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-import nest_asyncio
+from threading import Thread
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, ContextTypes
+)
+import asyncio
 
-TOKEN = os.getenv("BOT_TOKEN")  # Убедись, что переменная окружения настроена на Render
+# Токен бота из переменной окружения
+TOKEN = os.environ.get("BOT_TOKEN")
 
 app = Flask(__name__)
 
 @app.route("/")
 def index():
-    return "✅ Bot is alive!"
+    return "Bot is alive!"
 
-# Команда /start
+# Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("💰 Проверить баланс", callback_data="balance")],
-        [InlineKeyboardButton("📈 Статистика", callback_data="stats")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Привет! Что ты хочешь сделать?", reply_markup=reply_markup)
+    keyboard = [["💰 Баланс", "🚀 Купить хешрейт"],
+                ["👥 Пригласить друга", "ℹ️ Помощь"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Привет! Я бот для облачного майнинга.", reply_markup=reply_markup)
 
-# Обработка кнопок
-async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "balance":
-        await query.edit_message_text(text="💰 Ваш баланс: 0.000123 BTC")
-    elif query.data == "stats":
-        await query.edit_message_text(text="📈 Статистика: хешрейт 12 GH/s")
-
-# Telegram бот
+# Функция запуска Telegram-бота
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(handle_button))
-    await application.initialize()
-    await application.start()
     print("✅ Telegram bot started")
-    await application.updater.wait_until_closed()
+    await application.run_polling()
 
-# Flask-сервер
+# Функция запуска Flask
 def run_flask():
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    nest_asyncio.apply()  # Разрешает повторный запуск asyncio-цикла
+    # Запуск Flask-сервера в отдельном потоке
     Thread(target=run_flask).start()
+
+    # Запуск Telegram-бота с использованием уже запущенного event loop
+    import nest_asyncio
+    nest_asyncio.apply()
     asyncio.get_event_loop().run_until_complete(telegram_bot())
