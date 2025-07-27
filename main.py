@@ -1,36 +1,42 @@
 import os
-import asyncio
-from flask import Flask, request
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from flask import Flask
 from threading import Thread
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    CallbackQueryHandler,
+)
 
 TOKEN = os.getenv("BOT_TOKEN")
-CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 app = Flask(__name__)
-
-@app.route(f"/{WEBHOOK_SECRET}", methods=["POST"])
-def telegram_webhook():
-    data = request.json
-    return "ok"
-
-@app.route("/cryptobot", methods=["POST"])
-def cryptobot_webhook():
-    data = request.json
-    return "ok"
 
 @app.route("/")
 def index():
     return "Bot is alive!"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Я живой.")
+    keyboard = [
+        [InlineKeyboardButton("🛒 Купить", callback_data='buy')],
+        [InlineKeyboardButton("👤 Профиль", callback_data='profile')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Выбери действие:", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "buy":
+        await query.edit_message_text("Вы выбрали покупку.")
+    elif query.data == "profile":
+        await query.edit_message_text("Это ваш профиль.")
 
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
     await application.initialize()
     await application.start()
     print("✅ Telegram bot started")
@@ -40,10 +46,6 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Запускаем Flask-сервер в отдельном потоке
     Thread(target=run_flask).start()
-
-    # Получаем текущий event loop и запускаем в нём Telegram-бот
-    loop = asyncio.get_event_loop()
-    loop.create_task(telegram_bot())
-    loop.run_forever()
+    import asyncio
+    asyncio.run(telegram_bot())
