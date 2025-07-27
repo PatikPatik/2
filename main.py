@@ -1,8 +1,9 @@
 import os
 import asyncio
 from flask import Flask, request
-from telegram import Bot
-from telegram.ext import Application, CommandHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+from threading import Thread
 
 TOKEN = os.getenv("BOT_TOKEN")
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
@@ -10,44 +11,43 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 app = Flask(__name__)
 
-# Telegram handler
+# Flask Routes
 @app.route(f"/{WEBHOOK_SECRET}", methods=["POST"])
 def telegram_webhook():
     data = request.json
-    # Обработка апдейтов Telegram, если нужно
     return "ok"
 
-# CryptoBot handler
 @app.route("/cryptobot", methods=["POST"])
 def cryptobot_webhook():
     data = request.json
-    # Обработка оплаты от CryptoBot
-    # Например: проверка status == "paid", invoice_id и user_id
     return "ok"
 
 @app.route("/")
 def index():
     return "Bot is alive!"
 
-# запуск Telegram-бота
-async def run_telegram():
+# Telegram bot logic
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привет! Я живой.")
+
+async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
-
-    async def start(update, context):
-        await update.message.reply_text("Привет! Я живой.")
-
     application.add_handler(CommandHandler("start", start))
-    await application.run_polling()
+
+    # запуск в фоне
+    await application.initialize()
+    await application.start()
+    print("Telegram bot started ✅")
+    await application.updater.start_polling()
+    await application.updater.wait_until_closed()
+
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-
-    from threading import Thread
-    def run_flask():
-        app.run(host="0.0.0.0", port=port)
-
-    # запускаем Flask отдельно
+    # Запуск Flask в отдельном потоке
     Thread(target=run_flask).start()
 
-    # запускаем Telegram-бота
-    asyncio.run(run_telegram())
+    # Telegram в главном asyncio-потоке
+    asyncio.run(telegram_bot())
