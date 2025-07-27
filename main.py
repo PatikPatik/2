@@ -1,46 +1,54 @@
 import os
+import asyncio
 from threading import Thread
 from flask import Flask
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+import nest_asyncio
 
-TOKEN = os.environ.get("BOT_TOKEN")  # или вставь напрямую
+TOKEN = os.getenv("BOT_TOKEN")  # Убедись, что переменная окружения настроена на Render
 
 app = Flask(__name__)
 
 @app.route("/")
 def index():
-    return "Bot is alive!"
+    return "✅ Bot is alive!"
 
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [["🛒 Купить", "👤 Профиль"]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("Привет! Выбери действие:", reply_markup=reply_markup)
+    keyboard = [
+        [InlineKeyboardButton("💰 Проверить баланс", callback_data="balance")],
+        [InlineKeyboardButton("📈 Статистика", callback_data="stats")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Что ты хочешь сделать?", reply_markup=reply_markup)
 
-async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if text == "🛒 Купить":
-        await update.message.reply_text("🔄 Загружаю каталог...")
-    elif text == "👤 Профиль":
-        await update.message.reply_text("🧾 Вот информация о твоём профиле.")
-    else:
-        await update.message.reply_text("Я не понимаю эту команду 😕")
+# Обработка кнопок
+async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
+    if query.data == "balance":
+        await query.edit_message_text(text="💰 Ваш баланс: 0.000123 BTC")
+    elif query.data == "stats":
+        await query.edit_message_text(text="📈 Статистика: хешрейт 12 GH/s")
+
+# Telegram бот
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+    application.add_handler(CallbackQueryHandler(handle_button))
+    await application.initialize()
+    await application.start()
     print("✅ Telegram bot started")
-    await application.run_polling()
+    await application.updater.wait_until_closed()
 
+# Flask-сервер
 def run_flask():
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
+    nest_asyncio.apply()  # Разрешает повторный запуск asyncio-цикла
     Thread(target=run_flask).start()
-    import asyncio
-    asyncio.run(telegram_bot())
+    asyncio.get_event_loop().run_until_complete(telegram_bot())
