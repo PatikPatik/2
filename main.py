@@ -7,7 +7,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-TOKEN = os.environ.get("BOT_TOKEN")  # или замени на строку токена напрямую
+TOKEN = os.environ.get("BOT_TOKEN")  # или вставь напрямую
 
 app = Flask(__name__)
 
@@ -15,15 +15,11 @@ app = Flask(__name__)
 def index():
     return "Bot is alive!"
 
-# Команда /start с кнопками
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["🛒 Купить", "👤 Профиль"]
-    ]
+    keyboard = [["🛒 Купить", "👤 Профиль"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Привет! Выбери действие:", reply_markup=reply_markup)
 
-# Обработка кнопок
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if text == "🛒 Купить":
@@ -33,23 +29,17 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Я не понимаю эту команду 😕")
 
-# Telegram-бот
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
-
-    await application.initialize()
-    await application.start()
     print("✅ Telegram bot started")
-    await application.updater.wait_until_closed()
+    await application.run_polling()
 
-# Flask-сервер
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-# Точка входа
 if __name__ == "__main__":
     Thread(target=run_flask).start()
     import asyncio
