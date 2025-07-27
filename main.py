@@ -11,7 +11,6 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 app = Flask(__name__)
 
-# Flask маршруты
 @app.route(f"/{WEBHOOK_SECRET}", methods=["POST"])
 def telegram_webhook():
     data = request.json
@@ -26,22 +25,25 @@ def cryptobot_webhook():
 def index():
     return "Bot is alive!"
 
-# Telegram bot logic
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Я живой.")
 
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    print("Telegram bot started ✅")
-
-    # запуск polling и ожидание завершения
-    await application.run_polling()
+    await application.initialize()
+    await application.start()
+    print("✅ Telegram bot started")
 
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
+    # Запускаем Flask-сервер в отдельном потоке
     Thread(target=run_flask).start()
-    asyncio.run(telegram_bot())
+
+    # Получаем текущий event loop и запускаем в нём Telegram-бот
+    loop = asyncio.get_event_loop()
+    loop.create_task(telegram_bot())
+    loop.run_forever()
