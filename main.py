@@ -1,45 +1,61 @@
 import os
+import asyncio
 from flask import Flask
 from threading import Thread
-from telegram import Update, ReplyKeyboardMarkup
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application, CommandHandler, ContextTypes
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
 )
-import asyncio
 
-# Токен бота из переменной окружения
-TOKEN = os.environ.get("BOT_TOKEN")
+# Вставь сюда свой токен бота
+TOKEN = os.environ.get("BOT_TOKEN", "ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН")
 
+# Flask-сервер
 app = Flask(__name__)
 
 @app.route("/")
 def index():
     return "Bot is alive!"
 
-# Обработчик команды /start
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [["💰 Баланс", "🚀 Купить хешрейт"],
-                ["👥 Пригласить друга", "ℹ️ Помощь"]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("Привет! Я бот для облачного майнинга.", reply_markup=reply_markup)
+    keyboard = [
+        [InlineKeyboardButton("Кнопка 1", callback_data="btn1")],
+        [InlineKeyboardButton("Кнопка 2", callback_data="btn2")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Нажми на кнопку:", reply_markup=reply_markup)
 
-# Функция запуска Telegram-бота
+# Обработка нажатий
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "btn1":
+        await query.edit_message_text("Вы нажали на кнопку 1")
+    elif query.data == "btn2":
+        await query.edit_message_text("Вы нажали на кнопку 2")
+
+# Telegram-бот
 async def telegram_bot():
     application = Application.builder().token(TOKEN).build()
+
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+
     print("✅ Telegram bot started")
     await application.run_polling()
 
-# Функция запуска Flask
+# Flask run
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
+# Запуск
 if __name__ == "__main__":
-    # Запуск Flask-сервера в отдельном потоке
     Thread(target=run_flask).start()
-
-    # Запуск Telegram-бота с использованием уже запущенного event loop
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(telegram_bot())
+    asyncio.run(telegram_bot())
